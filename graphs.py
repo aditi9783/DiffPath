@@ -65,84 +65,45 @@ class graphs:
             lkey[lidx] = "1";
         return "".join(lkey);
 
-    def getGraphID( self, ndict, edict ):
-        gid = []; # list of all node-edge keys in the graph
+    def getNodeEdgeKeys( self, ndict, edict ): # create keys like keys in connectivitydict, for all edges in trigraph
+        keys = []; # list of all node-edge keys in the graph
         for nodes,edge in edict.iteritems():
-            gid.append( "-".join( [ndict[nodes[0]], ndict[nodes[1]], edge] ) );
-        return gid;   
+            keys.append( "-".join( [ndict[nodes[0]], ndict[nodes[1]], edge] ) );
+        return keys;   
 
-    def populateGDB( self, glist ): # take in a list of trigraphs and populate the gdb with it
-        print "number of graphs: ", len(glist);
+    def getGraphID( self, keys ): # generate an index of length 30, mapping frequncies of node-edge keys in the trigraph
+        idx = [0] * 30; # initialize graph id
+        for k in keys:
+            kid = connectivitydict[k];
+            idx[ kid ] += 1 # increase count of node-edge key in graph id
+        return "".join(str(x) for x in idx); # return string rep of graph
+
+    def populateGDB( self, glist, nlabels ): # take in a list of trigraphs and populate the gdb with it
+        gidmap = {}; # key is gid (graph id from nodes and edges), and value is list of trigraphs with that gid
+#        print "number of graphs: ", len(glist);
         for g in glist:
             # get node labels as dict that has key: node id, value: expression label (p,n,pp,nn)
-            nlabels = NX.get_node_attributes(g, 'elabel');
+            # nlabels = NX.get_node_attributes(g, 'elabel');
             # get edge labels as dict that has key: ids of nodes that have the edge, value: edge type
             edgelabels = NX.get_edge_attributes(g, 'type');
-            print nlabels;
-            print edgelabels;
-            gid = self.getGraphID(nlabels, edgelabels);
-            print gid;
-
-    def populateGDB_0( self, glist ): # take in a list of trigraphs and populate the gdb with it
-        print "number of graphs: ", len(glist);
-        for g in glist:
-            # get node labels as values of the dict that has key: node id, value: expression label (p,n,pp,nn)
-            nlabels = NX.get_node_attributes(g, 'elabel').values();
-            # get edge labels as values of the dict that has key: ids of nodes that have the edge, value: edge type
-            edgelabels = NX.get_edge_attributes(g, 'type').values();
-            nodekey = self.getLabelKey( nlabels, nodelabeldict );
-            edgekey = self.getLabelKey( edgelabels, edgelabeldict );
-            print nlabels, nodekey;
-            print edgelabels, edgekey;
-            # add graph to the graph database
-            self.gdb[nodekey][edgekey].append( g );
-            print "added to ", nodekey+edgekey;
-            print "\n", len(self.gdb["1100"]["1010"]), "\n";
-        # print self.gdb;
+            #print nlabels;
+            #print edgelabels;
+            gkeys = self.getNodeEdgeKeys(nlabels, edgelabels);
+            gid = self.getGraphID( gkeys );
+#            print gid
+            if gid in self.gdb: # if gid for this trigraph already exists in gdb, increment its count, else create new gid
+                self.gdb[gid] += 1;
+                gidmap[gid].append( g );
+            else:
+                self.gdb[gid] = 1;
+                gidmap[gid] = [g]; 
+        return gidmap;
 
     def getStats( self ):
-        graphdist = {};
-        for nkey in self.gdb:
-            for ekey in self.gdb[nkey]:
-                graphdist[nkey+ekey] = len(self.gdb[nkey][ekey]); # number of graphs with that combination of node and edge keys
-        for k,v in graphdist.iteritems():
-            print k,v;
-
-    def initializeGDB( self ):
-    # Two layered hash: first key represents node labels in each trigraph, second key represents edgelabels, the value of second key holds list of trigraphs with the edge and node lables given by the first two keys
-        gdbkeys = ["".join(seq) for seq in itertools.product("01", repeat=4)]; # generates all binary seq of length 4 (all possible instances of 4 node labels)
-        edgekeys = gdbkeys;
-        edgedict = dict( zip(edgekeys, [ [] for i in range(0,len(edgekeys)) ] ) ); # keys: binary seq for edges in trigraph, val: list of all trigraphs that match that edge set
-        # remove edgekey "0001" (there won't be a graph with all 'none' edges); "1111" (no trigraphs with all three edge types and also 'none' edgetype); 0000 (no trigraphs with no edges)
-        edgedict.pop("0001",None);
-        edgedict.pop("1111",None);
-        edgedict.pop("0000",None);
-
-        gdbvals = [ edgedict for i in range(0,len(gdbkeys)) ];
-        self.gdb = dict( zip(gdbkeys, gdbvals) );
-        # remove the '0000' key as at least one node label is expected to be there (even if all three nodes have same label)
-        # remove the '1111' key as trigraphs can have max 3 nodel labels 
-        self.gdb.pop("0000",None);
-        self.gdb.pop("1111",None);
-
-    def initializeGDB_0( self ):
-    # Two layered hash: first key represents node labels in each trigraph, second key represents edgelabels, the value of second key holds list of trigraphs with the edge and node lables given by the first two keys
-        gdbkeys = ["".join(seq) for seq in itertools.product("01", repeat=4)]; # generates all binary seq of length 4 (all possible instances of 4 node labels)
-        edgekeys = gdbkeys;
-        edgedict = dict( zip(edgekeys, [ [] for i in range(0,len(edgekeys)) ] ) ); # keys: binary seq for edges in trigraph, val: list of all trigraphs that match that edge set
-        # remove edgekey "0001" (there won't be a graph with all 'none' edges); "1111" (no trigraphs with all three edge types and also 'none' edgetype); 0000 (no trigraphs with no edges)
-        edgedict.pop("0001",None);
-        edgedict.pop("1111",None);
-        edgedict.pop("0000",None);
-
-        gdbvals = [ edgedict for i in range(0,len(gdbkeys)) ];
-        self.gdb = dict( zip(gdbkeys, gdbvals) );
-        # remove the '0000' key as at least one node label is expected to be there (even if all three nodes have same label)
-        # remove the '1111' key as trigraphs can have max 3 nodel labels 
-        self.gdb.pop("0000",None);
-        self.gdb.pop("1111",None);
-
-        # print self.gdb;
+        num_gids = len( self.gdb.values() );
+        print "Number of distinct trigraphs: ", num_gids;
+        print self.gdb.values();
+        print "Total number of subgraphs: ", sum(self.gdb.values());
 
     def __init__( self ): # read kegg xml file and parse it
         """
