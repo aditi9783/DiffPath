@@ -4,6 +4,21 @@ import xml.etree.ElementTree as ET
 import networkx as NX
 import itertools
 
+edgelabel = {'activation' : 'activate', 
+             'expression' : 'activate',
+             'inhibition' : 'inhibit',
+             'repression' : 'inhibit',
+             'indirect effect' : 'interact',
+             'state change' : 'interact',
+             'binding/association' : 'interact',
+             'dissociation' : 'interact',
+             'missing interaction' : 'interact',
+             'phosphorylation' : 'interact',
+             'dephosphorylation' : 'interact',
+             'glycosylation' : 'interact',
+             'ubiquitination' : 'interact',
+             'methylation' : 'interact' }; # keys are kegg terms for describing interactions, values are reduced representations of these terms used as edge labels in pathway graphs
+
 class pathway:
     """
     This class reads KGML files and generates traversable graph
@@ -22,22 +37,24 @@ class pathway:
         for child in self.root:
              if (child.tag == "entry"):
                  entryid = child.attrib['id']
-                 G.add_node(entryid)
                  if (child.attrib['type'] == "gene"):
+                     G.add_node(entryid) # only add "genes", not "ortholog" or "compound" or other entry types
                      for gc in child:
                          if (gc.tag == "graphics"):
-                             genelist = gc.attrib['name'].split(', ')
-                             self.genedict[entryid] = genelist 
-                             print entryid, genelist
+                             #genelist = gc.attrib['name'].split(', ')
+                             genes = gc.attrib['name'] # do not split the list of aliases, because we want to save non-redundant gene names from all pathways. This was it is faster to check redundancy.
+                             self.genedict[entryid] = genes
+                             #print entryid, genelist
                  # elif (child.attrib['type'] == "group"):
              elif (child.tag == "relation"):
                  node1 = child.attrib['entry1']
                  node2 = child.attrib['entry2']
+                 edgetype = "None" # default value for interaction between nodes
                  for gc in child:
                      if (gc.tag == "subtype"):
                          edgetype = gc.attrib['name']
-                 #print node1, node2, edgetype
-                 G.add_edge(node1, node2, type = edgetype) 
+                 print node1, node2, edgetype, edgelabel[edgetype];
+                 G.add_edge(node1, node2, type = edgelabel[edgetype]) 
 	return G;   
 
     def deapFormat( self, fname ):
@@ -69,10 +86,20 @@ class pathway:
                 for sub_nodes in itertools.combinations(g.nodes(),nnodes): # for all combinations of nnodes 
                     subgraph = g.subgraph(sub_nodes)
                     if NX.is_connected(subgraph):
-                        print subgraph.edges()
+                        # print subgraph.edges()
                         all_subg.append( subgraph )
         return all_subg
 
+    def removeNodes( self, explabelmap ): # nodes (genes) that don't have an expression value/ have multiple expression values
+        nodeswithlabel = set( explabelmap.keys() );
+        withoutlabel = list( set(self.pathwaygraph.nodes()) - set(nodeswithlabel) );
+        self.pathwaygraph.remove_nodes_from( withoutlabel );     
+
+    def addExpLabelNode( self, mapping ): #mapping has entry id as key, and exp label as value. Nodes have to be unique, so add expression label for each node as node attribute 
+
+        NX.set_node_attributes(self.pathwaygraph, 'elabel', mapping); 
+        #for n in self.pathwaygraph.nodes():
+        #    print n, self.pathwaygraph.node[n]['elabel'];
 
     def __init__( self, xml_file ): # read kegg xml file and parse it
         """
@@ -90,6 +117,6 @@ class pathway:
         self.genedict = {} # key is id, value is gene name and its aliases
         self.pathwaygraph = self.getpathway() # convert kgml pathway file into a graph object
         self.connectedpaths = NX.connected_components( self.pathwaygraph )
-        self.all_subg_size3 = self.getSubgraphs( 3 )
-        self.all_subg_size4 = self.getSubgraphs( 4 )
-        return self.deapFormat(xml_file)
+#        self.all_subg_size3 = self.getSubgraphs( 3 )
+#        self.all_subg_size4 = self.getSubgraphs( 4 )
+#        return self.deapFormat(xml_file)
