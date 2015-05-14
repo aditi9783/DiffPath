@@ -28,6 +28,9 @@ nrand = 100; # number of randomizations for calculating p-values
 
 exp_obj = geneexp(expf, genenameidx, foldchangeidx, state1idx, state2idx); 
 genelabels = exp_obj.assignNodeLabels(); # assign labels to gene based on gene expression
+print exp_obj.labeldist;
+labelprob = {k : float(exp_obj.labeldist[k])/sum(exp_obj.labeldist.values()) for k in exp_obj.labeldist.keys()}
+print labelprob;
 # print genelabels
 
 pgenes = {}; # dict of dict: key: pathway name, value: dictionary where key is pathway gene id (entry id= node name) and value is gene label
@@ -35,10 +38,6 @@ psubgraphs = {}; # key: pathway name, value: list of subgraphs from this pathway
 pgidmap = {}; # key: pathway name, value: dict with keys as gids and value as subgraphs with that gid
 prandcounts = {}; # key: pathway name, value: dict with keys as gid and value as occurence of that gid in randomizations
 #exit()
-
-nodelabels = ['nn','n','p','pp'];
-edgelabels = ['activate', 'inhibit'];
-gdb = graphs();
 
 def expLabelsPathgenes( pgenedict ):
     pgenelabels = {}; # this dict will be used to relabel pathway graph with gene-exp labels instead of entry-ids from kegg xml files
@@ -82,6 +81,7 @@ if (flag == 0): # pathway files have not been read
         if (".xml" not in f):
             continue  # only read .xml files
         pobj = pathway("./KEGGpathways/"+f);
+        print "genedict: ", pobj.genedict;
         pgenes[f] = expLabelsPathgenes( pobj.genedict ); # pgenes[f] has node id as key and exp label as value
         print "mapping: ", pgenes[f];
 #        print "Nodes before: ", pobj.pathwaygraph.nodes();
@@ -97,6 +97,7 @@ if (flag == 0): # pathway files have not been read
         pickle.dump(sub3, open("./KEGGpathways/"+f+'.sub3', 'w') );
         num3graphs += len(sub3);
         print f, len(sub3);
+        gdb = graphs(); # create new graph instance for this pathway
         pgidmap[f] = gdb.populateGDB( sub3, pgenes[f] );
         gdb.getStats();
 
@@ -111,13 +112,16 @@ for i in range(0,nrand):
 
     for p in pgenes: # p is pathway
         pg = pgenes[f]; # pg is a dict where node is key and expression label is value
-        # randomize the mapping between gene ids and expression labels
-        geneids = pg.keys();
-        random.shuffle( geneids );
-        randpg = dict( zip( geneids, pg.values() ) ); # randomize keys in pg and store that as a new dict
+        # randomize the mapping between gene ids and expression labels: pick labels from the global label distribution
+        ngenes = len(pg);
+        randlabels = ['p'] * int(round(labelprob['p'] * ngenes)) + ['pp'] * int(round(labelprob['pp'] * ngenes)) + ['n'] * int(round(labelprob['n'] * ngenes)) + ['nn'] * int(round(labelprob['nn'] * ngenes));
+        random.shuffle( randlabels );
+        randpg = dict( zip( pg.keys(), randlabels ) ); # randomize keys in pg and store that as a new dict
+        # geneids = pg.keys(); # the following lines randomized labels from within the same pathway
+        # random.shuffle( geneids );
+        # randpg = dict( zip( geneids, pg.values() ) ); # randomize keys in pg and store that as a new dict
         randgidmap = gdbrand.populateGDB( psubgraphs[p], randpg ); # provide subgraphs for this pathway, and randomized gene-expression mapping
         #gdbrand.getStats();
-        # print gdbrand.gdb; # this is the dict that has gid as key and frequency of this gid as value
 
     for p in pgenes: # this time, check how many randomized gdb had the true gids
         for gid in pgidmap[p]:
@@ -133,3 +137,6 @@ print "From ", nrand, " randomizations of gene expression labels:";
 for p in prandcounts: # for each pathway
     for gid in prandcounts[p]:
         print gid, len(pgidmap[p][gid]), prandcounts[p][gid];
+        # if p-value < 0.05, retrieve the corresponding subgraph
+        if (float(prandcounts[p][gid])/nrand <= 0.05):
+            retrieveGraphs( pgidmap[p][gid] );
