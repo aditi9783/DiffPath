@@ -36,6 +36,7 @@ class geneexp:
         print "raw mean and sd: ", raw_avg_logfc, raw_stdev_logfc;
         stats.probplot( ge_arr, plot=matplotlib.pyplot )
         matplotlib.pyplot.savefig('qqplot_raw.png')
+        matplotlib.pyplot.close();
 
         # if the distribution is not central, the n and nn labels could be assigned to genes with > 0 log(fc). To avoid this, convert gene exp values to z-scores and recalculate mean and sd
         for k in self.geneexpdict.keys():
@@ -52,6 +53,7 @@ class geneexp:
         print "centralized mean and sd: ", self.avg_logfoldchange, self.stdev_logfoldchange;
         stats.probplot( ge_arr, plot=matplotlib.pyplot )
         matplotlib.pyplot.savefig('qqplot_centralized.png')
+        matplotlib.pyplot.close();
 
     def assignNodeLabels( self ): # assign labels as: 'n' for negative (underexpressed), 'p' for positive (overexpressed)
     # -1 sd < log(fc) < mu => label 'n' for genes that are weakly underexpressed, mu and sd are from log(fc) distribution
@@ -61,15 +63,20 @@ class geneexp:
     # these definitions can be further extended to 'nnn' for log(fc) < -2 sd, and 'ppp' for log(fc) > 2 sd              
     # Also leave genes whose expression is too close to the mean. Set lowerthres for that.
         genelabels = {};
-        sigfac = 1 # how many SD away from mean should we assign labels for strong change in exp
-        stdev_thres = sigfac * self.stdev_logfoldchange
+        sigfac1 = 1 # how many SD away from mean should we assign labels pp and nn 
+        sigfac2 = 2 # how many SD away from mean should we assign labels ppp and nnn 
+        stdev_thres1 = sigfac1 * self.stdev_logfoldchange
+        stdev_thres2 = sigfac2 * self.stdev_logfoldchange
         lowerthres = 0.01 * self.stdev_logfoldchange; # all genes with logfc lower than mean+lowerthres and higher than mean-lowerthres will be unlabeled and thus ignored (genes too close to average log fc)
-        print "lowerthres: ", lowerthres, " stdevthres: ", stdev_thres;
+        print "lowerthres: ", lowerthres, " stdevthres1: ", stdev_thres1, " stdevthres2: ", stdev_thres2;
         numunlabeled = 0;
         for gene in self.geneexpdict:
             log_fc = self.geneexpdict[gene];
             if (log_fc < self.avg_logfoldchange):
-                if (log_fc < self.avg_logfoldchange-stdev_thres):
+                if (log_fc < self.avg_logfoldchange-stdev_thres2):
+                    genelabels[gene] = 'nnn';
+                    self.labeldist['nnn'] += 1;
+                elif (log_fc < self.avg_logfoldchange-stdev_thres1):
                     genelabels[gene] = 'nn';
                     self.labeldist['nn'] += 1;
                 elif (log_fc < self.avg_logfoldchange-lowerthres):
@@ -78,7 +85,10 @@ class geneexp:
                 else:
                     numunlabeled += 1;
             elif (log_fc > self.avg_logfoldchange):
-                if (log_fc > self.avg_logfoldchange+stdev_thres):
+                if (log_fc > self.avg_logfoldchange+stdev_thres2):
+                    genelabels[gene] = 'ppp';
+                    self.labeldist['ppp'] += 1;
+                elif (log_fc > self.avg_logfoldchange+stdev_thres1):
                     genelabels[gene] = 'pp';
                     self.labeldist['pp'] += 1;
                 elif (log_fc > self.avg_logfoldchange+lowerthres):
@@ -90,6 +100,7 @@ class geneexp:
             # print gene, log_fc;
         print "Number of unlabeled genes: ", numunlabeled;
         # genes that are turned off get 'nn' and those that are turned on get 'pp' label
+        # not 'nnn' and 'ppp' because the on/off signal could just be due to less data
         for gene in self.on_or_off_genes:
             if (self.on_or_off_genes[gene] == "ON"):
                  genelabels[gene] = 'pp';
@@ -104,7 +115,7 @@ class geneexp:
         self.on_or_off_genes = {};
         self.avg_logfoldchange = 0.0; # initialize mean and sd for log fold change distribution
         self.stdev_logfoldchange = 0.0;
-        self.labeldist = {'p': 0, 'pp' : 0, 'n' : 0, 'nn' : 0};
+        self.labeldist = {'p': 0, 'pp' : 0, 'ppp' : 0, 'n' : 0, 'nn' : 0, 'nnn' : 0};
 
         self.readGeneExp( expfile, genenameidx, foldchangeidx, beforeidx, afteridx ) # index for the gene name and log2 fold change or ratio of expression 
         self.statsAnalysis(); # draws q-q plot for the distribution and computes, mean, sd for the gene-exp values
