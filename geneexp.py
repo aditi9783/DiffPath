@@ -1,4 +1,4 @@
-# Class to read gene expression data
+''' Class to read gene expression data.'''
 
 import numpy
 from scipy import stats
@@ -7,24 +7,32 @@ matplotlib.use('Agg')
 import pylab
 import math
 
+# change name to GeneExp 
 class geneexp: 
-
-    def readGeneExp( self, fname, i1, ifc, i2, i3): # write a function to deal with replicate data
-        fh = open(fname, 'r')
-        fh.readline()  # remove first line from the file that has column headers: TEST IF THIS IS NEEDED (content[i2] should be float)
-        for line in fh:
+    # rename to read_GeneExp
+    def readGeneExp(self, fname, idx_gene, ifc, i2, i3):
+        '''write a function to deal with replicate data'''
+        #with open(fname, 'r') as fh:
+	fh = open(fname, 'r')
+        
+	# remove first line from the file that has column headers: 
+	# TEST IF THIS IS NEEDED (content[i2] should be float)
+	fh.readline() 
+        
+	for line in fh:
            content = line.split('\t')
-           #print content
-           after = float( content[i3] )
-           before = float( content[i2] )
-           if ( before == after and before == 0.0 ): # both genes don't show any expression: skip these because a)not interesting, b) could be due to insufficient data
+           after = float(content[i3])
+           before = float(content[i2])
+ 	   # both genes don't show any expression: skip these because 
+	   # a)not interesting, b) could be due to insufficient data
+           if before == after and before == 0.0:
                continue;
-           elif ( before == 0.0 ): # gene is turned on in the 'after' sample
-               self.on_or_off_genes[ content[i1] ] = "ON"
-           elif ( after == 0.0 ): # gene is turned off in the 'after' sample
-               self.on_or_off_genes[ content[i1] ] = "OFF"
+           elif before == 0.0: # gene is turned on in the 'after' sample
+               self.on_or_off_genes[ content[idx_gene] ] = "ON"
+           elif after == 0.0: # gene is turned off in the 'after' sample
+               self.on_or_off_genes[ content[idx_gene] ] = "OFF"
            else:
-               self.geneexpdict[content[i1]] = float(content[ifc]); # simple ratio of gene exp (after/before) is not normal, that's why use log fold change as a measure of expression change
+               self.geneexpdict[content[idx_gene]] = float(content[ifc]); # simple ratio of gene exp (after/before) is not normal, that's why use log fold change as a measure of expression change
                #self.geneexpdict[content[i1]] = after/before; # ratio of gene exp: after/before
 
     def statsAnalysis( self ):
