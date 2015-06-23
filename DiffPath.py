@@ -153,9 +153,16 @@ for f in allkgmlfiles:
                 sigsubgraphs[pobj.pathname][pvalue] = [sigpath];
 
 binaryarr, pvals_corr = fdrcorrection0(pvals, 0.1, method='indep'); # 10% FDR rate (GSEA uses 25%)
-#print pvals;
-#print binaryarr;
-#print pvals_corr;
+pval_correctedPval = {}; # key: p-value, value: corrected P-value; only those subgraphs with fdr < 0.1, i.e. binaryarr = True
+#print("Printing pvals\n", pvals)
+#print("\nPrinting binaryarr:\n", binaryarr)
+#print("\nPrinting corrected_pval:\n", pvals_corr)
+for i,ba in enumerate(binaryarr):
+    if (ba):
+        pval_correctedPval[pvals[i]] = pvals_corr[i]
+
+#print pval_correctedPval
+        
 
 plt.hist(pvals);
 plt.savefig("pval_hist.pdf");
@@ -170,11 +177,11 @@ for pname in sigsubgraphs:
     sigkeys = sigsubgraphs[pname].keys();
     print "\n", pname;
     for pv in sigsubgraphs[pname].keys():
-        if (pv < 0.009):
+        if (pv in pval_correctedPval): #if the p-value is significant according the the fdr rate chosen
             numsigpath += 1;
-            print "p-value: ", pv;
+            print "p-value: ", pv, "\tFDR corrected p-value: ", pval_correctedPval[pv];
             for sigp in sigsubgraphs[pname][pv]:
                 print sigp, "\n";
 #    print sigsubgraphs[pname];
-print "Number of significant pathways (original p-value < 0.009):", numsigpath;
+print "Number of significant pathways:", numsigpath;
 print "Total number of subgraphs analyzed: ", numsubgraphs;
