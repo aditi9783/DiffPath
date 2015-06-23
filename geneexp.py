@@ -10,7 +10,22 @@ import collections
 
 # change name to GeneExp 
 class geneexp: 
-    # rename to read_GeneExp
+
+    def __init__ (self, expfile, genenameidx, foldchangeidx, beforeidx, afteridx):
+        self.geneexpdict = {}; # dictionary with key = gene name, value = ratio of gene exp/ log fold change in gene exp. This does not include genes that are turned on or off in the 'after' sample. Those are stored separately.
+        self.on_or_off_genes = {};
+        self.avg_logfoldchange = 0.0; # initialize mean and sd for log fold change distribution
+        self.stdev_logfoldchange = 0.0;
+        self.labeldist = collections.Counter()
+
+        self.readGeneExp( expfile, genenameidx, foldchangeidx, beforeidx, afteridx ) # index for the gene name and log2 fold change or ratio of expression 
+        self.statsAnalysis(); # draws q-q plot for the distribution and computes, mean, sd for the gene-exp values
+#        self.assignNodeLabels(); # label genes based on the gene expression
+        print "Number of on/off genes: ", len(self.on_or_off_genes);
+        print "Number of genes with expression value in both conditions: ", len(self.geneexpdict);
+        #return self.genelabels; 
+         
+########
     def readGeneExp(self, fname, idx_gene, ifc, i2, i3):
         '''write a function to deal with replicate data'''
         #with open(fname, 'r') as fh:
@@ -35,8 +50,7 @@ class geneexp:
            else:
                self.geneexpdict[content[idx_gene]] = float(content[ifc]); # simple ratio of gene exp (after/before) is not normal, that's why use log fold change as a measure of expression change
 
-
-
+########
     def statsAnalysis( self ):
 
     	def make_QQ( val_list, type_ ):
@@ -59,9 +73,9 @@ class geneexp:
             self.geneexpdict[k] = zscore;
 
         # recompute distribution parameters
-	make_QQ( self.geneexpdict.values(), "centralized" )
+	self.avg_logfoldchange, self.stdev_logfoldchange = make_QQ( self.geneexpdict.values(), "centralized" )
 
-
+########
     def assignNodeLabels( self ): # assign labels as: 'n' for negative (underexpressed), 'p' for positive (overexpressed)
     # -1 sd < log(fc) < mu => label 'n' for genes that are weakly underexpressed, mu and sd are from log(fc) distribution
     # log(fc) < -1 sd => label 'nn' for genes that are strongly underexpressed (below -1 SD)
@@ -82,16 +96,14 @@ class geneexp:
                     self.labeldist['nn'] += 1;
 
 	def assign_ExpLabel(log_fc, avg_change):
-            if log_fc < avg_change:
+            if log_fc <= avg_change:
 	        label = 'n'
             elif log_fc > avg_change:
                 label = 'p'
-            else:
-                return ""  
 
 	    for i, thres in enumerate(thresholds):
                 if (log_fc < avg_change-thres) or (log_fc > avg_change+thres):
-                    return label*(i+1)
+                    return label*(n_thres-i)
             
         genelabels = {};
         sigfac1 = 1 # how many SD away from mean should we assign labels pp and nn 
@@ -99,30 +111,22 @@ class geneexp:
         stdev_thres1 = sigfac1 * self.stdev_logfoldchange
         stdev_thres2 = sigfac2 * self.stdev_logfoldchange
         lowerthres = 0.01 * self.stdev_logfoldchange; # all genes with logfc lower than mean+lowerthres and higher than mean-lowerthres will be unlabeled and thus ignored (genes too close to average log fc)
-        print "lowerthres: ", lowerthres, " stdevthres1: ", stdev_thres1, " stdevthres2: ", stdev_thres2;
+        num_unlabeled = 0;
+        print("lowerthres: ", lowerthres, " stdevthres1: ", stdev_thres1, " stdevthres2: ", stdev_thres2)
 
-	thresholds = [lowerthres, stdev_thres1, stdev_thres2]
+	thresholds = [stdev_thres2, stdev_thres1, lowerthres] # this order is important, otherwise every gene gets p or n 
+        n_thres = len(thresholds)
 
         for gene, log_fc in self.geneexpdict.items():
-            exp_label = assign_ExpLabel(log_fc, self.avg_logfoldchange)
-            genelabels[gene] = exp_label
-            self.labeldist[exp_label] += 1;
-        print "Number of unlabeled genes: ", self.labeldist[""];
+            if (log_fc > self.avg_logfoldchange+lowerthres or log_fc < self.avg_logfoldchange-lowerthres):
+                exp_label = assign_ExpLabel(log_fc, self.avg_logfoldchange)
+                genelabels[gene] = exp_label
+                self.labeldist[exp_label] += 1
+            else:
+                num_unlabeled += 1
+
+        print("Number of unlabeled genes: ", num_unlabeled)
 
         label_OnOffGenes()
         return genelabels;
 
-    def __init__ (self, expfile, genenameidx, foldchangeidx, beforeidx, afteridx):
-        self.geneexpdict = {}; # dictionary with key = gene name, value = ratio of gene exp/ log fold change in gene exp. This does not include genes that are turned on or off in the 'after' sample. Those are stored separately.
-        self.on_or_off_genes = {};
-        self.avg_logfoldchange = 0.0; # initialize mean and sd for log fold change distribution
-        self.stdev_logfoldchange = 0.0;
-        self.labeldist = collections.Counter()
-
-        self.readGeneExp( expfile, genenameidx, foldchangeidx, beforeidx, afteridx ) # index for the gene name and log2 fold change or ratio of expression 
-        self.statsAnalysis(); # draws q-q plot for the distribution and computes, mean, sd for the gene-exp values
-#        self.assignNodeLabels(); # label genes based on the gene expression
-        print "Number of on/off genes: ", len(self.on_or_off_genes);
-        print "Number of genes with expression value in both conditions: ", len(self.geneexpdict);
-        #return self.genelabels; 
-         
