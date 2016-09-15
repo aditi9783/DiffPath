@@ -8,10 +8,10 @@ import pylab
 import math
 import collections
 
-# change name to GeneExp 
+# change name to GeneExp
 class geneexp: 
 
-    def __init__ (self, expfile, genenameidx, foldchangeidx, beforeidx, afteridx):
+    def __init__ (self, expfile, genenameidx, foldchangeidx, beforeidx, afteridx, outputdir):
         self.geneexpdict = {}; # dictionary with key = gene name, value = ratio of gene exp/ log fold change in gene exp. This does not include genes that are turned on or off in the 'after' sample. Those are stored separately.
         self.on_or_off_genes = {};
         self.avg_logfoldchange = 0.0; # initialize mean and sd for log fold change distribution
@@ -19,7 +19,7 @@ class geneexp:
         self.labeldist = collections.Counter()
 
         self.readGeneExp( expfile, genenameidx, foldchangeidx, beforeidx, afteridx ) # index for the gene name and log2 fold change or ratio of expression 
-        self.statsAnalysis(); # draws q-q plot for the distribution and computes, mean, sd for the gene-exp values
+        self.statsAnalysis(outputdir); # draws q-q plot for the distribution and computes, mean, sd for the gene-exp values
 #        self.assignNodeLabels(); # label genes based on the gene expression
         print "Number of on/off genes: ", len(self.on_or_off_genes);
         print "Number of genes with expression value in both conditions: ", len(self.geneexpdict);
@@ -51,7 +51,7 @@ class geneexp:
                self.geneexpdict[content[idx_gene]] = float(content[ifc]); # simple ratio of gene exp (after/before) is not normal, that's why use log fold change as a measure of expression change
 
 ########
-    def statsAnalysis( self ):
+    def statsAnalysis( self, outputdir ):
 
     	def make_QQ( val_list, type_ ):
 	    ge_arr = numpy.array( val_list )
@@ -61,7 +61,7 @@ class geneexp:
             stdev_logfc = numpy.std( ge_arr );
             print type_, " mean and sd: ", avg_logfc, stdev_logfc;
             stats.probplot( ge_arr, plot=matplotlib.pyplot )
-            matplotlib.pyplot.savefig('qqplot_'+type_+'.png')
+            matplotlib.pyplot.savefig(outputdir + '/qqplot_'+type_+'.png')
             matplotlib.pyplot.close();
             return avg_logfc, stdev_logfc
  
